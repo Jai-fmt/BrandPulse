@@ -28,6 +28,7 @@ export interface EmployeeRow {
   title: string | null;
   linkedin_url: string | null;
   linkedin_id: string | null;
+  instagram_handle?: string | null;
   avatar_url: string | null;
   total_points: number;
   level: string;
@@ -73,7 +74,7 @@ export interface BadgeRow {
 
 // ─── Insert / Update types ────────────────────────────────────────────────────
 
-export type EmployeeInsert = Omit<EmployeeRow, "id" | "created_at" | "updated_at" | "total_points" | "level">;
+export type EmployeeInsert = Omit<EmployeeRow, "id" | "created_at" | "updated_at" | "total_points" | "level" | "instagram_handle">;
 export type EmployeeUpdate = Partial<Omit<EmployeeRow, "id" | "created_at" | "updated_at">>;
 
 export type PostInsert = Omit<PostRow, "id" | "created_at" | "total_likes" | "total_comments" | "total_shares" | "total_reposts">;

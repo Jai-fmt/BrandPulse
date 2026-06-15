@@ -8,9 +8,5 @@ export default async function EmployeesPage() {
   const employees = result?.data ?? [];
   const error = result?.error;
 
-  return (
-    <div className="p-8">
-      <EmployeeDirectory initialEmployees={employees ?? []} error={error?.message} />
-    </div>
-  );
+  return <EmployeeDirectory initialEmployees={employees ?? []} error={error?.message} />;
 }
