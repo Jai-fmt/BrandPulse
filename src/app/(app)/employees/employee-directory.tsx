@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { UserPlus, Upload, Search, Pencil, Trash2, Link2, Camera, Database } from "lucide-react";
+import { UserPlus, Upload, Search, Pencil, Trash2, Link2, Camera, Database, Users } from "lucide-react";
 import { clsx } from "clsx";
 import { DEPARTMENTS, DEPT_COLORS, LEVEL_COLORS } from "@/constants";
 import { getInitials, getIgHandle } from "@/lib/utils/format";
@@ -291,13 +291,66 @@ export function EmployeeDirectory({
       <div className="flex gap-4 px-8 pb-8 flex-1">
         <div className="flex-1 bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden min-w-0">
           {filtered.length === 0 ? (
-            <div className="py-20 text-center">
-              <p className="text-gray-500 text-sm">
-                {search || deptFilter
-                  ? "No employees match your filters."
-                  : "No employees yet. Add your first employee or import a CSV."}
-              </p>
-            </div>
+            search || deptFilter ? (
+              /* No search results */
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+                  <Search className="w-6 h-6 text-gray-500" />
+                </div>
+                <p className="text-white font-semibold text-base mb-1">No results found</p>
+                <p className="text-gray-500 text-sm max-w-xs">
+                  No employees match{search ? ` "${search}"` : ""}{deptFilter ? ` in ${deptFilter}` : ""}. Try adjusting your search or filter.
+                </p>
+                <button
+                  onClick={() => { setSearch(""); setDeptFilter(""); }}
+                  className="mt-5 text-sm text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              /* Truly empty — no employees at all */
+              <div className="flex flex-col items-center justify-center py-24 text-center px-8">
+                {/* Illustration */}
+                <div className="relative mb-6">
+                  <div className="w-24 h-24 rounded-3xl bg-emerald-900/20 border border-emerald-800/30 flex items-center justify-center">
+                    <Users className="w-10 h-10 text-emerald-600" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-xl bg-violet-900/40 border border-violet-700/30 flex items-center justify-center">
+                    <UserPlus className="w-4 h-4 text-violet-400" />
+                  </div>
+                  <div className="absolute -bottom-2 -left-2 w-7 h-7 rounded-lg bg-blue-900/40 border border-blue-700/30 flex items-center justify-center">
+                    <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                </div>
+
+                <p className="text-white font-semibold text-lg mb-2">No employees yet</p>
+                <p className="text-gray-500 text-sm max-w-sm leading-relaxed mb-6">
+                  Add your team manually or import everyone at once from a CSV file. Each employee gets tracked for LinkedIn and Instagram engagement.
+                </p>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowCsvModal(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 text-sm font-medium transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import CSV
+                  </button>
+                  <button
+                    onClick={() => { setEditingEmployee(null); setShowAddModal(true); }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Add First Employee
+                  </button>
+                </div>
+
+                <p className="mt-6 text-xs text-gray-600">
+                  CSV format: <span className="text-gray-500">name, email</span> · optional: department, title, linkedin_url, instagram_handle
+                </p>
+              </div>
+            )
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
