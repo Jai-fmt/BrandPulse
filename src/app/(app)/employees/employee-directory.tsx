@@ -167,7 +167,7 @@ export function EmployeeDirectory({
 
     if (supabase) {
       const { data: { user } } = await supabase.auth.getUser();
-      const org_id = user!.id;
+      const org_id = await ensureOrg(user!.id);
       const newRows = rows.filter((r) => !existingEmails.has(r.email));
       if (newRows.length === 0) {
         return { added: 0, skipped };
