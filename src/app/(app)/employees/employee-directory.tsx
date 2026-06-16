@@ -68,23 +68,28 @@ export function EmployeeDirectory({
   const localCount = employees.filter((e) => e.org_id === "local").length;
 
   async function ensureOrg(userId: string): Promise<string> {
-    const { data: existing } = await supabase!
-      .from("organizations")
-      .select("id")
-      .eq("id", userId)
+    // org ID ≠ user ID — look up via org_members join table
+    const { data: membership } = await supabase!
+      .from("org_members")
+      .select("org_id")
+      .eq("user_id", userId)
       .maybeSingle();
-    if (existing) return existing.id;
-    const { error } = await supabase!.from("organizations").insert({
-      id: userId,
-      name: "My Organization",
-      slug: userId,
-      linkedin_org_id: null,
-      instagram_account_id: null,
-      linkedin_access_token: null,
-      instagram_access_token: null,
-    });
-    if (error && !error.message.includes("duplicate")) throw new Error(error.message);
-    return userId;
+    if (membership?.org_id) return membership.org_id;
+
+    // First time: create org, then add user as owner
+    const { data: org, error: orgError } = await supabase!
+      .from("organizations")
+      .insert({ name: "My Organization", slug: `org-${userId.slice(0, 8)}` })
+      .select("id")
+      .single();
+    if (orgError) throw new Error(orgError.message);
+
+    const { error: memberError } = await supabase!
+      .from("org_members")
+      .insert({ org_id: org.id, user_id: userId, role: "owner" });
+    if (memberError) throw new Error(memberError.message);
+
+    return org.id;
   }
 
   async function handleSave(form: EmployeeFormData) {
