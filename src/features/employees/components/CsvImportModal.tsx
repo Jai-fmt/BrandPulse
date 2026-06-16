@@ -8,18 +8,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CloudUpload, CheckCircle2 } from "lucide-react";
+import { CloudUpload, CheckCircle2, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 import Papa from "papaparse";
 import type { EmployeeFormData } from "../types";
 
 type CsvStep = "select" | "preview" | "success";
 
+interface ImportResult {
+  added: number;
+  skipped: number;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   existingEmails: Set<string>;
-  onImport: (rows: EmployeeFormData[], newCount: number, existCount: number) => Promise<void>;
+  onImport: (rows: EmployeeFormData[]) => Promise<ImportResult>;
 }
 
 const STEP_LABELS = ["Import Employee Directory", "Review Import", "Import Complete"];
@@ -29,7 +34,7 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
   const [preview, setPreview] = useState<EmployeeFormData[]>([]);
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [resultCounts, setResultCounts] = useState({ newCount: 0, existCount: 0 });
+  const [result, setResult] = useState<ImportResult>({ added: 0, skipped: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const newCount = preview.filter((r) => !existingEmails.has(r.email)).length;
@@ -51,19 +56,19 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
         }));
         const valid = rows.filter((r) => r.name && r.email);
         if (valid.length === 0) {
-          toast.error("No valid rows. CSV needs 'name' and 'email' columns.");
+          toast.error("No valid rows found. CSV must have 'name' and 'email' columns.");
           return;
         }
         setPreview(valid);
         setStep("preview");
       },
-      error: () => toast.error("Failed to parse CSV."),
+      error: () => toast.error("Failed to parse CSV file."),
     });
   }
 
   function handleFile(file: File) {
     if (!file.name.endsWith(".csv")) {
-      toast.error("Please upload a CSV file.");
+      toast.error("Please upload a .csv file.");
       return;
     }
     parseFile(file);
@@ -71,16 +76,23 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
 
   async function handleImport() {
     setImporting(true);
-    setResultCounts({ newCount, existCount });
-    await onImport(preview, newCount, existCount);
-    setImporting(false);
-    setStep("success");
+    try {
+      const importResult = await onImport(preview);
+      setResult(importResult);
+      setStep("success");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Import failed. Please try again.";
+      toast.error(message);
+    } finally {
+      setImporting(false);
+    }
   }
 
   function handleClose() {
     setStep("select");
     setPreview([]);
     setImporting(false);
+    setResult({ added: 0, skipped: 0 });
     onClose();
   }
 
@@ -111,16 +123,24 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
           </div>
         </DialogHeader>
 
+        {/* Step 1 — Select file */}
         {step === "select" && (
           <div className="space-y-4 py-2">
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const f = e.dataTransfer.files[0];
+                if (f) handleFile(f);
+              }}
               onClick={() => fileRef.current?.click()}
               className={clsx(
                 "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors",
-                dragOver ? "border-emerald-500 bg-emerald-950/20" : "border-white/10 hover:border-white/20 hover:bg-white/5"
+                dragOver
+                  ? "border-emerald-500 bg-emerald-950/20"
+                  : "border-white/10 hover:border-white/20 hover:bg-white/5"
               )}
             >
               <CloudUpload className="w-10 h-10 text-gray-500 mx-auto mb-3" />
@@ -131,7 +151,11 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
                 type="file"
                 accept=".csv"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                  e.target.value = "";
+                }}
               />
             </div>
             <p className="text-xs text-gray-600 text-center">
@@ -142,6 +166,7 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
           </div>
         )}
 
+        {/* Step 2 — Preview */}
         {step === "preview" && (
           <div className="space-y-4 py-2">
             <div className="flex items-stretch gap-3">
@@ -149,15 +174,22 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
                 <p className="text-2xl font-bold text-white">{preview.length}</p>
                 <p className="text-xs text-gray-500 mt-0.5">Total rows</p>
               </div>
-              <div className="flex-1 bg-amber-950/40 border border-amber-800/30 rounded-xl px-4 py-3 text-center">
-                <p className="text-2xl font-bold text-amber-300">{existCount}</p>
-                <p className="text-xs text-amber-600 mt-0.5">Already exist</p>
-              </div>
               <div className="flex-1 bg-emerald-950/40 border border-emerald-800/30 rounded-xl px-4 py-3 text-center">
                 <p className="text-2xl font-bold text-emerald-300">{newCount}</p>
                 <p className="text-xs text-emerald-700 mt-0.5">New employees</p>
               </div>
+              <div className="flex-1 bg-amber-950/40 border border-amber-800/30 rounded-xl px-4 py-3 text-center">
+                <p className="text-2xl font-bold text-amber-300">{existCount}</p>
+                <p className="text-xs text-amber-600 mt-0.5">Already exist</p>
+              </div>
             </div>
+
+            {newCount === 0 && (
+              <div className="flex items-center gap-2.5 bg-amber-950/40 border border-amber-800/30 rounded-xl px-4 py-3 text-sm text-amber-300">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                All emails in this CSV are already in the directory. No new employees will be added.
+              </div>
+            )}
 
             <div className="max-h-52 overflow-y-auto rounded-xl bg-[#111] border border-white/5">
               <table className="w-full text-xs">
@@ -166,7 +198,7 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
                     <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Name</th>
                     <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Email</th>
                     <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Department</th>
-                    <th className="px-3 py-2.5 text-gray-500 font-semibold w-14 text-center">Status</th>
+                    <th className="px-3 py-2.5 text-gray-500 font-semibold w-16 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -177,9 +209,13 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
                       <td className="px-3 py-2 text-gray-400">{row.department || "—"}</td>
                       <td className="px-3 py-2 text-center">
                         {existingEmails.has(row.email) ? (
-                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-900/40 text-amber-300">update</span>
+                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-900/40 text-amber-300">
+                            skip
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-emerald-900/40 text-emerald-300">new</span>
+                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-emerald-900/40 text-emerald-300">
+                            new
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -189,20 +225,24 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <button onClick={() => { setStep("select"); setPreview([]); }} className="text-sm text-gray-500 hover:text-white transition-colors">
+              <button
+                onClick={() => { setStep("select"); setPreview([]); }}
+                className="text-sm text-gray-500 hover:text-white transition-colors"
+              >
                 ← Back
               </button>
               <button
                 onClick={handleImport}
-                disabled={importing}
-                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                disabled={importing || newCount === 0}
+                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
               >
-                {importing ? "Importing…" : `Import ${preview.length} Employees`}
+                {importing ? "Importing…" : `Import ${newCount} New Employee${newCount !== 1 ? "s" : ""}`}
               </button>
             </div>
           </div>
         )}
 
+        {/* Step 3 — Success */}
         {step === "success" && (
           <div className="py-10 text-center space-y-3">
             <div className="w-16 h-16 rounded-full bg-emerald-900/40 border border-emerald-700/30 flex items-center justify-center mx-auto">
@@ -210,11 +250,18 @@ export function CsvImportModal({ open, onClose, existingEmails, onImport }: Prop
             </div>
             <p className="text-lg font-semibold text-white">Import Complete!</p>
             <p className="text-sm text-gray-400">
-              <span className="text-emerald-300 font-medium">{resultCounts.newCount} added</span>
-              {" · "}
-              <span className="text-amber-300 font-medium">{resultCounts.existCount} updated</span>
+              <span className="text-emerald-300 font-medium">{result.added} employee{result.added !== 1 ? "s" : ""} added</span>
+              {result.skipped > 0 && (
+                <>
+                  {" · "}
+                  <span className="text-gray-500">{result.skipped} skipped (already exist)</span>
+                </>
+              )}
             </p>
-            <button onClick={handleClose} className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors inline-block">
+            <button
+              onClick={handleClose}
+              className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors inline-block"
+            >
               Done
             </button>
           </div>

@@ -162,14 +162,15 @@ export function EmployeeDirectory({
     toast.success("Employee removed.");
   }
 
-  async function handleCsvImport(rows: EmployeeFormData[]) {
+  async function handleCsvImport(rows: EmployeeFormData[]): Promise<{ added: number; skipped: number }> {
+    const skipped = rows.filter((r) => existingEmails.has(r.email)).length;
+
     if (supabase) {
       const { data: { user } } = await supabase.auth.getUser();
       const org_id = user!.id;
       const newRows = rows.filter((r) => !existingEmails.has(r.email));
       if (newRows.length === 0) {
-        toast.success("No new employees — all emails already exist.");
-        return;
+        return { added: 0, skipped };
       }
       const { data, error } = await supabase
         .from("employees")
@@ -183,13 +184,14 @@ export function EmployeeDirectory({
           is_active: true,
         })))
         .select();
-      if (error) { toast.error(`Import failed: ${error.message}`); return; }
+      if (error) throw new Error(error.message);
       const imported = (data ?? []).map((d, i) => ({
         ...d,
         instagram_handle: newRows[i]?.instagram_handle || null,
       }));
       setEmployees((prev) => [...imported, ...prev]);
       router.refresh();
+      return { added: imported.length, skipped };
     } else {
       const emailMap = new Map(employees.map((e) => [e.email, e]));
       const newEmps: EmployeeWithIG[] = [];
@@ -211,7 +213,7 @@ export function EmployeeDirectory({
         }
       }
       setEmployees([...newEmps, ...Array.from(updatedMap.values())]);
-      toast.success(`Imported ${newEmps.length} new employees (saved locally).`);
+      return { added: newEmps.length, skipped };
     }
   }
 
@@ -428,7 +430,7 @@ export function EmployeeDirectory({
         open={showCsvModal}
         onClose={() => setShowCsvModal(false)}
         existingEmails={existingEmails}
-        onImport={async (rows) => { await handleCsvImport(rows); }}
+        onImport={(rows) => handleCsvImport(rows)}
       />
     </div>
   );
