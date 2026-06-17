@@ -4,7 +4,10 @@ import { LeaderboardClient } from "./leaderboard-client";
 export default async function LeaderboardPage() {
   const supabase = await createClient();
 
-  // Run both queries in parallel instead of sequentially
+  // Fetch last 90 days of engagements (covers weekly/monthly/quarterly client-side filters)
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
   const [employeesRes, engagementsRes] = await Promise.all([
     supabase
       ?.from("employees")
@@ -14,16 +17,17 @@ export default async function LeaderboardPage() {
       Promise.resolve({ data: [] }),
     supabase
       ?.from("engagements")
-      .select("employee_id, engagement_type") ??
+      .select("employee_id, engagement_type, points, created_at")
+      .gte("created_at", ninetyDaysAgo.toISOString()) ??
       Promise.resolve({ data: [] }),
   ]);
 
   const employees = employeesRes?.data ?? [];
-  const engagements = engagementsRes?.data ?? [];
+  const recentEngagements = engagementsRes?.data ?? [];
 
-  // Build engagement map in a single pass
+  // Build all-time engagement breakdown map (using the 90-day window for type counts)
   const engagementMap: Record<string, { likes: number; comments: number; shares: number; reposts: number }> = {};
-  for (const eng of engagements) {
+  for (const eng of recentEngagements) {
     if (!eng.employee_id) continue;
     const m = engagementMap[eng.employee_id] ??= { likes: 0, comments: 0, shares: 0, reposts: 0 };
     if (eng.engagement_type === "like") m.likes++;
@@ -36,6 +40,7 @@ export default async function LeaderboardPage() {
     <LeaderboardClient
       employees={employees ?? []}
       engagementMap={engagementMap}
+      recentEngagements={recentEngagements}
     />
   );
 }

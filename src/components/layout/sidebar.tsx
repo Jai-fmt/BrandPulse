@@ -10,6 +10,8 @@ import {
   Settings,
   Zap,
   LogOut,
+  Megaphone,
+  ClipboardCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +21,8 @@ const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart2 },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/posts", label: "Post Tracking", icon: FileText },
+  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/submissions", label: "Submissions", icon: ClipboardCheck },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
