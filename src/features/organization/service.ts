@@ -40,6 +40,7 @@ export async function getSyncConfig(orgId: string): Promise<SyncConfig | null> {
       "instagram_business_account_id, instagram_handles"
     )
     .eq("id", orgId)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .single() as unknown as { data: Record<string, any> | null; error: unknown };
 
   if (error || !data) return null;

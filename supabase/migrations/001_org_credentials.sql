@@ -29,6 +29,11 @@ CREATE TRIGGER organizations_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_org_updated_at();
 
 -- Org owners can update their org (settings save)
-CREATE POLICY "Org owners can update their org"
-  ON public.organizations FOR UPDATE TO authenticated
-  USING (is_org_owner(id));
+DO $do$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'organizations' AND policyname = 'Org owners can update their org'
+  ) THEN
+    EXECUTE $$CREATE POLICY "Org owners can update their org" ON public.organizations FOR UPDATE TO authenticated USING (is_org_owner(id));$$;
+  END IF;
+END $do$;

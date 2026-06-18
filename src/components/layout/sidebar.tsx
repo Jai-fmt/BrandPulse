@@ -10,7 +10,6 @@ import {
   Settings,
   Zap,
   LogOut,
-  Megaphone,
   ClipboardCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -22,8 +21,7 @@ const NAV = [
   { href: "/leaderboard", label: "Leaderboard",  icon: Trophy },
   { href: "/posts",       label: "Post Tracking",icon: FileText },
   { href: "/employees",   label: "Employees",    icon: Users },
-  // { href: "/campaigns",   label: "Campaigns",    icon: Megaphone },
-  // { href: "/submissions", label: "Submissions",  icon: ClipboardCheck },
+  { href: "/submissions", label: "Submissions",  icon: ClipboardCheck },
   { href: "/settings",    label: "Settings",     icon: Settings },
 ];
 

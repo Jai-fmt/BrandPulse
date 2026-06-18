@@ -25,6 +25,7 @@ export async function getOrganizationSettings(): Promise<ActionResult<OrgCredent
       "instagram_app_secret, instagram_access_token"
     )
     .eq("id", orgId)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .single() as unknown as { data: Record<string, any> | null; error: { message: string } | null };
 
   if (error || !data) return { data: null, error: error?.message ?? "No data." };
@@ -59,7 +60,8 @@ export async function updateOrganizationSettings(
 
   // Only include fields that have a non-empty value so we never overwrite
   // existing secrets with blanks when only updating public fields.
-  const patch: Record<string, unknown> = {};
+  const patch: // eslint-disable-next-line @typescript-eslint/no-explicit-any
+Record<string, any> = {};
 
   const publicFields = [
     "linkedin_company_url",
@@ -115,6 +117,7 @@ export async function validateLinkedInConnection(): Promise<ValidationResult> {
     .from("organizations")
     .select("linkedin_access_token, linkedin_company_id")
     .eq("id", orgId)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .single() as unknown as Promise<{ data: Record<string, any> | null }>);
 
   if (!data?.linkedin_access_token) {
@@ -139,6 +142,7 @@ export async function validateInstagramConnection(): Promise<ValidationResult> {
     .from("organizations")
     .select("instagram_access_token")
     .eq("id", orgId)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .single() as unknown as Promise<{ data: Record<string, any> | null }>);
 
   if (!data?.instagram_access_token) {

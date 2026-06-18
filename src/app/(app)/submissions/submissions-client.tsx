@@ -7,6 +7,8 @@ import { Plus, CheckCircle2, XCircle, Clock, Link2, ClipboardCheck, ExternalLink
 import { Input } from "@/components/ui/input";
 import { clsx } from "clsx";
 import { getInitials } from "@/lib/utils/format";
+import { POINTS_MAP } from "@/constants";
+import type { EngagementType } from "@/constants";
 
 type SubmissionStatus = "pending" | "approved" | "rejected";
 
@@ -14,8 +16,8 @@ type Submission = {
   id: string;
   employee_id: string;
   employee_name: string;
-  campaign_id: string | null;
-  campaign_name: string | null;
+  engagement_type: string | null;
+  platform: string | null;
   post_url: string | null;
   notes: string | null;
   status: SubmissionStatus;
@@ -26,7 +28,6 @@ type Submission = {
 };
 
 type Employee = { id: string; name: string; email: string };
-type Campaign = { id: string; name: string };
 
 const STATUS_STYLES: Record<SubmissionStatus, string> = {
   pending:  "bg-amber-900/40 text-amber-300 border-amber-800/40",
@@ -40,6 +41,14 @@ const STATUS_ICONS: Record<SubmissionStatus, React.ElementType> = {
   rejected: XCircle,
 };
 
+const ENGAGEMENT_OPTIONS: { value: EngagementType; label: string }[] = [
+  { value: "like",    label: "Like" },
+  { value: "comment", label: "Comment" },
+  { value: "share",   label: "Share" },
+  { value: "repost",  label: "Repost" },
+  { value: "mention", label: "Mention" },
+];
+
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
@@ -47,12 +56,10 @@ function fmtDate(d: string) {
 export function SubmissionsClient({
   initialSubmissions,
   employees,
-  campaigns,
   orgId,
 }: {
   initialSubmissions: Submission[];
   employees: Employee[];
-  campaigns: Campaign[];
   orgId: string;
 }) {
   const supabase = createClient();
@@ -61,19 +68,18 @@ export function SubmissionsClient({
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<Submission | null>(null);
 
-  // Submit form state
   const [submitForm, setSubmitForm] = useState({
     employee_id: "",
-    campaign_id: "",
+    engagement_type: "" as EngagementType | "",
+    platform: "" as "linkedin" | "instagram" | "",
     post_url: "",
     notes: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Review form state
   const [reviewForm, setReviewForm] = useState({
     status: "approved" as SubmissionStatus,
-    points_awarded: 15,
+    points_awarded: 1,
     reviewer_notes: "",
   });
   const [reviewing, setReviewing] = useState(false);
@@ -89,24 +95,33 @@ export function SubmissionsClient({
     ? submissions
     : submissions.filter((s) => s.status === statusFilter);
 
+  function handleEngagementTypeChange(type: EngagementType | "") {
+    const pts = type ? POINTS_MAP[type] : 1;
+    setSubmitForm((f) => ({ ...f, engagement_type: type }));
+    setReviewForm((f) => ({ ...f, points_awarded: pts }));
+  }
+
   async function handleSubmit() {
     if (!submitForm.employee_id) { toast.error("Select an employee."); return; }
+    if (!submitForm.engagement_type) { toast.error("Select an engagement type."); return; }
+    if (!submitForm.platform) { toast.error("Select a platform."); return; }
     if (!submitForm.post_url && !submitForm.notes) { toast.error("Add a post URL or notes."); return; }
     if (!supabase || !orgId) { toast.error("Not connected to database."); return; }
     setSubmitting(true);
     try {
       const emp = employees.find((e) => e.id === submitForm.employee_id);
-      const camp = campaigns.find((c) => c.id === submitForm.campaign_id);
+      const pts = POINTS_MAP[submitForm.engagement_type as EngagementType] ?? 1;
       const { data, error } = await supabase
         .from("manual_submissions")
         .insert({
           org_id: orgId,
           employee_id: submitForm.employee_id,
-          campaign_id: submitForm.campaign_id || null,
+          engagement_type: submitForm.engagement_type,
+          platform: submitForm.platform,
           post_url: submitForm.post_url || null,
           notes: submitForm.notes || null,
           status: "pending",
-          points_awarded: 15,
+          points_awarded: pts,
         })
         .select()
         .single();
@@ -114,9 +129,8 @@ export function SubmissionsClient({
       setSubmissions((prev) => [{
         ...data,
         employee_name: emp?.name ?? "Unknown",
-        campaign_name: camp?.name ?? null,
       }, ...prev]);
-      setSubmitForm({ employee_id: "", campaign_id: "", post_url: "", notes: "" });
+      setSubmitForm({ employee_id: "", engagement_type: "", platform: "", post_url: "", notes: "" });
       setShowSubmitModal(false);
       toast.success("Proof submitted for review.");
     } catch (err) {
@@ -127,8 +141,11 @@ export function SubmissionsClient({
   }
 
   function openReview(s: Submission) {
+    const pts = s.engagement_type
+      ? (POINTS_MAP[s.engagement_type as EngagementType] ?? s.points_awarded)
+      : s.points_awarded;
     setReviewTarget(s);
-    setReviewForm({ status: "approved", points_awarded: 15, reviewer_notes: "" });
+    setReviewForm({ status: "approved", points_awarded: pts, reviewer_notes: "" });
   }
 
   async function handleReview() {
@@ -148,11 +165,7 @@ export function SubmissionsClient({
         .single();
       if (error) throw new Error(error.message);
       setSubmissions((prev) =>
-        prev.map((s) =>
-          s.id === reviewTarget.id
-            ? { ...s, ...data }
-            : s
-        )
+        prev.map((s) => s.id === reviewTarget.id ? { ...s, ...data } : s)
       );
       setReviewTarget(null);
       toast.success(reviewForm.status === "approved" ? "Submission approved." : "Submission rejected.");
@@ -243,7 +256,7 @@ export function SubmissionsClient({
             </p>
             <p className="text-gray-500 text-sm max-w-xs mb-5">
               {statusFilter === "all"
-                ? "Employees can submit advocacy proof — screenshots, post URLs, or campaign participation."
+                ? "Submit proof of employee engagement on official company posts."
                 : "No submissions match this filter."}
             </p>
             {statusFilter === "all" && (
@@ -260,7 +273,7 @@ export function SubmissionsClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/5">
-                  {["Employee", "Campaign", "Post URL", "Notes", "Status", "Points", "Date", ""].map((h, i) => (
+                  {["Employee", "Platform", "Type", "Post URL", "Notes", "Status", "Points", "Date", ""].map((h, i) => (
                     <th
                       key={i}
                       className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-left whitespace-nowrap"
@@ -283,8 +296,11 @@ export function SubmissionsClient({
                           <span className="text-white font-medium text-sm">{sub.employee_name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-400 text-sm whitespace-nowrap">
-                        {sub.campaign_name ?? <span className="text-gray-600">—</span>}
+                      <td className="px-4 py-3 text-gray-400 text-xs capitalize whitespace-nowrap">
+                        {sub.platform ?? <span className="text-gray-600">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 text-xs capitalize whitespace-nowrap">
+                        {sub.engagement_type ?? <span className="text-gray-600">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         {sub.post_url ? (
@@ -357,15 +373,29 @@ export function SubmissionsClient({
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-400 mb-1.5 block font-medium">Campaign (optional)</label>
+                <label className="text-xs text-gray-400 mb-1.5 block font-medium">Platform *</label>
                 <select
-                  value={submitForm.campaign_id}
-                  onChange={(e) => setSubmitForm((f) => ({ ...f, campaign_id: e.target.value }))}
+                  value={submitForm.platform}
+                  onChange={(e) => setSubmitForm((f) => ({ ...f, platform: e.target.value as "linkedin" | "instagram" | "" }))}
                   className="w-full bg-[#111] border border-white/10 text-white text-sm rounded-md px-3 h-9 focus:outline-none focus:border-emerald-500"
                 >
-                  <option value="">No campaign</option>
-                  {campaigns.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                  <option value="">Select platform…</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="instagram">Instagram</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1.5 block font-medium">Engagement Type *</label>
+                <select
+                  value={submitForm.engagement_type}
+                  onChange={(e) => handleEngagementTypeChange(e.target.value as EngagementType | "")}
+                  className="w-full bg-[#111] border border-white/10 text-white text-sm rounded-md px-3 h-9 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">Select type…</option>
+                  {ENGAGEMENT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label} ({POINTS_MAP[o.value]} pt{POINTS_MAP[o.value] !== 1 ? "s" : ""})
+                    </option>
                   ))}
                 </select>
               </div>
@@ -383,7 +413,7 @@ export function SubmissionsClient({
                 <textarea
                   value={submitForm.notes}
                   onChange={(e) => setSubmitForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder="Describe the advocacy activity…"
+                  placeholder="Describe the engagement…"
                   rows={2}
                   className="w-full bg-[#111] border border-white/10 text-white text-sm rounded-md px-3 py-2 resize-none focus:outline-none focus:border-emerald-500 placeholder:text-gray-600"
                 />
@@ -412,7 +442,12 @@ export function SubmissionsClient({
             <h2 className="text-lg font-semibold text-white mb-1">Review Submission</h2>
             <p className="text-gray-500 text-sm mb-5">
               From <span className="text-white">{reviewTarget.employee_name}</span>
-              {reviewTarget.campaign_name && <> · <span className="text-emerald-400">{reviewTarget.campaign_name}</span></>}
+              {reviewTarget.engagement_type && (
+                <> · <span className="text-emerald-400 capitalize">{reviewTarget.engagement_type}</span></>
+              )}
+              {reviewTarget.platform && (
+                <> on <span className="text-blue-400 capitalize">{reviewTarget.platform}</span></>
+              )}
             </p>
 
             {reviewTarget.post_url && (

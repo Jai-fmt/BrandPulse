@@ -22,6 +22,7 @@ interface LeaderboardEntry {
   comments: number;
   shares: number;
   reposts: number;
+  mentions: number;
   score: number;
 }
 
@@ -77,7 +78,7 @@ function DeptBadge({ dept }: { dept: string | null }) {
 
 interface Props {
   employees: Employee[];
-  engagementMap: Record<string, { likes: number; comments: number; shares: number; reposts: number }>;
+  engagementMap: Record<string, { likes: number; comments: number; shares: number; reposts: number; mentions: number }>;
   recentEngagements: RecentEngagement[];
 }
 
@@ -97,7 +98,8 @@ export function LeaderboardClient({ employees, engagementMap, recentEngagements 
     const days = PERIOD_DAYS[timePeriod];
     if (days === null) return null; // all-time: use total_points from DB
 
-    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
     const map: Record<string, number> = {};
     for (const eng of recentEngagements) {
       if (!eng.employee_id) continue;
@@ -110,7 +112,7 @@ export function LeaderboardClient({ employees, engagementMap, recentEngagements 
   const allEntries: LeaderboardEntry[] = useMemo(() => {
     return employees
       .map((emp) => {
-        const stats = engagementMap[emp.id] ?? { likes: 0, comments: 0, shares: 0, reposts: 0 };
+        const stats = engagementMap[emp.id] ?? { likes: 0, comments: 0, shares: 0, reposts: 0, mentions: 0 };
         const score = periodPointsMap === null
           ? emp.total_points              // all-time: fast denormalised value
           : (periodPointsMap[emp.id] ?? 0); // period: summed from recent engagements
@@ -211,6 +213,8 @@ export function LeaderboardClient({ employees, engagementMap, recentEngagements 
                 <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">👍 Likes</th>
                 <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">💬 Cmts</th>
                 <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">🔁 Shares</th>
+                <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">↩️ Reposts</th>
+                <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">@ Mentions</th>
                 <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                   Score
                   {timePeriod !== "all-time" && (
@@ -222,7 +226,7 @@ export function LeaderboardClient({ employees, engagementMap, recentEngagements 
             <tbody>
               {tableEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-20 text-center text-gray-500 text-sm">
+                  <td colSpan={9} className="py-20 text-center text-gray-500 text-sm">
                     No employees to display.
                   </td>
                 </tr>
@@ -253,6 +257,8 @@ export function LeaderboardClient({ employees, engagementMap, recentEngagements 
                       <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.likes}</td>
                       <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.comments}</td>
                       <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.shares}</td>
+                      <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.reposts}</td>
+                      <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.mentions}</td>
                       <td className="px-5 py-3 text-right">
                         <span className="text-emerald-400 font-bold text-base">{entry.score}</span>
                       </td>
@@ -266,10 +272,11 @@ export function LeaderboardClient({ employees, engagementMap, recentEngagements 
 
         <div className="mt-4 flex items-center gap-6 text-xs text-gray-600">
           <span>Scoring:</span>
-          <span>💬 Comment = 5 pts</span>
-          <span>🔁 Share / Repost = 10 pts</span>
-          <span>✍️ Advocacy Post = 15 pts</span>
-          <span>✅ Manual Submission = 15 pts</span>
+          <span>👍 Like = 1 pt</span>
+          <span>💬 Comment = 3 pts</span>
+          <span>🔁 Share = 5 pts</span>
+          <span>↩️ Repost = 5 pts</span>
+          <span>@ Mention = 2 pts</span>
         </div>
       </div>
     </div>

@@ -2,21 +2,15 @@
 
 import { useState } from "react";
 import {
-  Building2,
   Link2,
   Camera,
-  Bell,
-  Database,
-  Zap,
   Eye,
   EyeOff,
   Copy,
   X,
   Plus,
-  RefreshCw,
   Shield,
   CheckCircle2,
-  AlertCircle,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,42 +22,14 @@ import { useOrgSettings } from "@/features/organization/hooks/use-org-settings";
 import type { OrgCredentialsPublic } from "@/features/organization/types";
 
 const TABS = [
-  { id: "organization", label: "Organization", icon: Building2 },
-  { id: "linkedin",     label: "LinkedIn",     icon: Link2 },
-  { id: "instagram",    label: "Instagram",    icon: Camera },
-  { id: "notifications",label: "Notifications",icon: Bell },
-  { id: "data-export",  label: "Data & Export",icon: Database },
-  { id: "scoring",      label: "Scoring Model",icon: Zap },
+  { id: "linkedin",  label: "LinkedIn",  icon: Link2 },
+  { id: "instagram", label: "Instagram", icon: Camera },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
-// ── Shared primitives ──────────────────────────────────────────────────────────
+// ── SecretInput ────────────────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors focus:outline-none",
-        checked ? "bg-green-500" : "bg-gray-600"
-      )}
-    >
-      <span className={cn(
-        "pointer-events-none mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
-        checked ? "translate-x-5" : "translate-x-0.5"
-      )} />
-    </button>
-  );
-}
-
-/**
- * A field for sensitive values.
- * When `isSet` is true and the user hasn't started typing, shows a "saved" indicator.
- * Typing replaces the indicator — user must explicitly type a new value to overwrite.
- */
 function SecretInput({
   isSet,
   value,
@@ -125,27 +91,6 @@ function SecretInput({
 }
 
 // ── Tab views ──────────────────────────────────────────────────────────────────
-
-function OrganizationView() {
-  return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-6">
-      <div className="mb-5 border-b border-gray-800 pb-4">
-        <h2 className="text-base font-semibold text-white">Organization</h2>
-        <p className="mt-1 text-sm text-gray-400">Basic details about your BrandPulse instance.</p>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-sm text-gray-300">Organization Name</Label>
-          <Input defaultValue="FarMart" className="h-9 border-gray-700 bg-gray-800 text-white" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-sm text-gray-300">Admin Email</Label>
-          <Input defaultValue="marketing@farmart.co" type="email" className="h-9 border-gray-700 bg-gray-800 text-white" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 interface LinkedInViewProps {
   form: { company_url: string; client_id: string; company_id: string; client_secret: string; access_token: string };
@@ -407,112 +352,15 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
   );
 }
 
-function NotificationsView() {
-  const [newPost, setNewPost] = useState(true);
-  const [weeklyReport, setWeeklyReport] = useState(true);
-  const [dropAlert, setDropAlert] = useState(false);
-
-  const items = [
-    { label: "New Post Tracked",        desc: "Alert when a new LinkedIn or Instagram post is added",      checked: newPost,      onChange: setNewPost },
-    { label: "Weekly Engagement Report",desc: "Email summary of metrics every Monday morning",              checked: weeklyReport, onChange: setWeeklyReport },
-    { label: "Participation Drop Alert",desc: "Notify when weekly participation drops by more than 10%",   checked: dropAlert,    onChange: setDropAlert },
-  ];
-
-  return (
-    <div className="space-y-5 rounded-xl border border-gray-800 bg-gray-900 p-6">
-      <div className="border-b border-gray-800 pb-4">
-        <h2 className="text-base font-semibold text-white">Notifications</h2>
-        <p className="mt-1 text-sm text-gray-400">Control when the marketing team receives alerts.</p>
-      </div>
-      <div className="overflow-hidden rounded-lg border border-gray-800">
-        {items.map(({ label, desc, checked, onChange }, i) => (
-          <div key={label} className={cn("flex items-center justify-between bg-gray-800/50 px-4 py-4", i < items.length - 1 && "border-b border-gray-800")}>
-            <div>
-              <p className="text-sm font-medium text-white">{label}</p>
-              <p className="mt-0.5 text-xs text-gray-400">{desc}</p>
-            </div>
-            <Toggle checked={checked} onChange={onChange} />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DataExportView() {
-  const exports = [
-    { label: "Export Employees CSV",   desc: "All employee records" },
-    { label: "Export Engagements CSV", desc: "All engagement history" },
-    { label: "Export Posts CSV",       desc: "All tracked posts" },
-    { label: "Full Data Export",       desc: "Everything in one archive" },
-  ];
-
-  return (
-    <div className="space-y-6 rounded-xl border border-gray-800 bg-gray-900 p-6">
-      <div className="border-b border-gray-800 pb-4">
-        <h2 className="text-base font-semibold text-white">Data & Export</h2>
-        <p className="mt-1 text-sm text-gray-400">Manage how engagement data is stored and exported.</p>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {exports.map(({ label, desc }) => (
-          <button key={label} onClick={() => toast.success(`${label} started.`)}
-            className="flex items-center gap-3 rounded-lg border border-gray-700 bg-gray-800 px-4 py-3.5 text-left transition-colors hover:bg-gray-700">
-            <RefreshCw className="h-4 w-4 shrink-0 text-gray-400" />
-            <div>
-              <p className="text-sm font-medium text-white">{label}</p>
-              <p className="text-xs text-gray-400">{desc}</p>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ScoringModelView() {
-  const items = [
-    { label: "Comment",            desc: "Employee comments on a company post",       pts: 5,  unit: "pts" },
-    { label: "Mention FarMart",    desc: "Employee mentions FarMart in a post",       pts: 5,  unit: "pts" },
-    { label: "Campaign Hashtag",   desc: "Employee uses an active campaign hashtag",  pts: 5,  unit: "pts" },
-    { label: "Story Mention",      desc: "Employee mentions FarMart in a story",      pts: 5,  unit: "pts" },
-    { label: "Share / Repost",     desc: "Employee shares or reposts company content",pts: 10, unit: "pts" },
-    { label: "Advocacy Post",      desc: "Employee creates original advocacy content",pts: 15, unit: "pts" },
-    { label: "Manual Submission",  desc: "Verified manual submission approved",       pts: 15, unit: "pts" },
-  ];
-
-  return (
-    <div className="space-y-5 rounded-xl border border-gray-800 bg-gray-900 p-6">
-      <div className="border-b border-gray-800 pb-4">
-        <h2 className="text-base font-semibold text-white">Engagement Scoring Model</h2>
-        <p className="mt-1 text-sm text-gray-400">Points awarded per advocacy action per the BrandPulse PRD.</p>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {items.map(({ label, desc, pts, unit }) => (
-          <div key={label} className="flex items-start justify-between rounded-lg border border-gray-700 bg-gray-800 p-4">
-            <div>
-              <p className="text-sm font-semibold text-white">{label}</p>
-              <p className="mt-0.5 text-xs text-gray-400">{desc}</p>
-            </div>
-            <span className="ml-3 shrink-0 rounded bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-400">
-              {pts} {unit}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Root component ─────────────────────────────────────────────────────────────
 
 export function SettingsClient({
-  userEmail: _userEmail,
   initialSettings,
 }: {
-  userEmail: string;
+  userEmail?: string;
   initialSettings: OrgCredentialsPublic | null;
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>("organization");
+  const [activeTab, setActiveTab] = useState<TabId>("linkedin");
 
   const {
     linkedIn, setLinkedIn,
@@ -559,8 +407,6 @@ export function SettingsClient({
         </nav>
 
         <div className="min-w-0 flex-1">
-          {activeTab === "organization"  && <OrganizationView />}
-
           {activeTab === "linkedin" && (
             <LinkedInView
               form={linkedIn}
@@ -581,10 +427,6 @@ export function SettingsClient({
               validating={validating === "instagram"}
             />
           )}
-
-          {activeTab === "notifications"  && <NotificationsView />}
-          {activeTab === "data-export"    && <DataExportView />}
-          {activeTab === "scoring"        && <ScoringModelView />}
         </div>
       </div>
     </div>
