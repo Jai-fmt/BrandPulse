@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   updateOrganizationSettings,
+  clearPlatformSettings,
   validateLinkedInConnection,
   validateInstagramConnection,
 } from "@/app/actions/organization";
@@ -50,6 +51,7 @@ export function useOrgSettings(initial: OrgCredentialsPublic | null) {
   });
 
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState<"linkedin" | "instagram" | null>(null);
   const [validating, setValidating] = useState<"linkedin" | "instagram" | null>(null);
 
   async function save() {
@@ -112,11 +114,40 @@ export function useOrgSettings(initial: OrgCredentialsPublic | null) {
     }
   }
 
+  async function clearLinkedIn() {
+    setClearing("linkedin");
+    try {
+      const result = await clearPlatformSettings("linkedin");
+      if (result.error) throw new Error(result.error);
+      setLinkedIn({ company_url: "", client_id: "", company_id: "", client_secret: "", access_token: "" });
+      toast.success("LinkedIn credentials cleared.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear LinkedIn settings.");
+    } finally {
+      setClearing(null);
+    }
+  }
+
+  async function clearInstagram() {
+    setClearing("instagram");
+    try {
+      const result = await clearPlatformSettings("instagram");
+      if (result.error) throw new Error(result.error);
+      setInstagram({ app_id: "", business_account_id: "", handles: [], app_secret: "", access_token: "" });
+      toast.success("Instagram credentials cleared.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear Instagram settings.");
+    } finally {
+      setClearing(null);
+    }
+  }
+
   return {
     linkedIn, setLinkedIn,
     instagram, setInstagram,
     secretsSet,
     saving, save,
+    clearing, clearLinkedIn, clearInstagram,
     validating, testLinkedIn, testInstagram,
   };
 }

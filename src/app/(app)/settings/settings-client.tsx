@@ -12,6 +12,8 @@ import {
   Shield,
   CheckCircle2,
   Loader2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,17 +99,41 @@ interface LinkedInViewProps {
   secretsSet: { linkedin_client_secret: boolean; linkedin_access_token: boolean };
   onChange: (field: string, value: string) => void;
   onValidate: () => Promise<void>;
+  onClear: () => Promise<void>;
   validating: boolean;
+  clearing: boolean;
 }
 
-function LinkedInView({ form, secretsSet, onChange, onValidate, validating }: LinkedInViewProps) {
+function LinkedInView({ form, secretsSet, onChange, onValidate, onClear, validating, clearing }: LinkedInViewProps) {
+  const [editing, setEditing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const disabled = !editing;
+
   return (
     <div className="space-y-6 rounded-xl border border-gray-800 bg-gray-900 p-6">
-      <div className="border-b border-gray-800 pb-4">
-        <h2 className="text-base font-semibold text-white">LinkedIn Integration</h2>
-        <p className="mt-1 text-sm text-gray-400">
-          Connect your LinkedIn company page to track employee engagement on posts.
-        </p>
+      <div className="flex items-start justify-between border-b border-gray-800 pb-4">
+        <div>
+          <h2 className="text-base font-semibold text-white">LinkedIn Integration</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Connect your LinkedIn company page to track employee engagement on posts.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditing((e) => !e)}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+            editing
+              ? "border-gray-600 text-gray-400 hover:border-gray-500 hover:text-white"
+              : "border-green-700 bg-green-500/10 text-green-400 hover:bg-green-500/20"
+          )}
+        >
+          {editing ? (
+            <><X className="h-3.5 w-3.5" /> Cancel</>
+          ) : (
+            <><Pencil className="h-3.5 w-3.5" /> Edit</>
+          )}
+        </button>
       </div>
 
       <div className="space-y-1.5">
@@ -117,7 +143,8 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, validating }: Li
           value={form.company_url}
           onChange={(e) => onChange("company_url", e.target.value)}
           placeholder="https://linkedin.com/company/farmart"
-          className="h-9 border-gray-700 bg-gray-800 text-white focus-visible:border-green-500"
+          disabled={disabled}
+          className="h-9 border-gray-700 bg-gray-800 text-white focus-visible:border-green-500 disabled:cursor-not-allowed disabled:opacity-50"
         />
       </div>
 
@@ -132,7 +159,7 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, validating }: Li
             under your app&apos;s Auth settings.
           </p>
         </div>
-        <div className="space-y-4 rounded-lg border border-gray-700 bg-gray-800 p-4">
+        <div className={cn("space-y-4 rounded-lg border border-gray-700 bg-gray-800 p-4 transition-opacity", disabled && "opacity-60")}>
           <div className="flex items-center gap-2 border-b border-gray-700 pb-3">
             <div className="flex h-5 w-5 items-center justify-center rounded bg-[#0077B5]">
               <span className="text-[9px] font-bold text-white">in</span>
@@ -145,7 +172,8 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, validating }: Li
               value={form.client_id}
               onChange={(e) => onChange("client_id", e.target.value)}
               placeholder="86xxxxxxxxxxxxxxxx"
-              className="h-9 border-gray-600 bg-gray-900 text-white"
+              disabled={disabled}
+              className="h-9 border-gray-600 bg-gray-900 text-white disabled:cursor-not-allowed"
             />
           </div>
           <div className="space-y-1.5">
@@ -163,7 +191,8 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, validating }: Li
               value={form.company_id}
               onChange={(e) => onChange("company_id", e.target.value)}
               placeholder="123456789"
-              className="h-9 border-gray-600 bg-gray-900 text-white"
+              disabled={disabled}
+              className="h-9 border-gray-600 bg-gray-900 text-white disabled:cursor-not-allowed"
             />
           </div>
           <div className="space-y-1.5">
@@ -179,18 +208,51 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, validating }: Li
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onValidate}
-          disabled={validating || !secretsSet.linkedin_access_token}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-600 text-sm text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 transition-colors"
-        >
-          {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-          Test Connection
-        </button>
-        {!secretsSet.linkedin_access_token && (
-          <p className="text-xs text-gray-500">Save an access token first to test.</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onValidate}
+            disabled={validating || !secretsSet.linkedin_access_token}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-600 text-sm text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 transition-colors"
+          >
+            {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            Test Connection
+          </button>
+          {!secretsSet.linkedin_access_token && (
+            <p className="text-xs text-gray-500">Save an access token first to test.</p>
+          )}
+        </div>
+
+        {confirmClear ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Remove all LinkedIn credentials?</span>
+            <button
+              type="button"
+              onClick={async () => { await onClear(); setConfirmClear(false); setEditing(false); }}
+              disabled={clearing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+            >
+              {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              Yes, clear
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmClear(false)}
+              className="px-3 py-1.5 rounded-lg border border-gray-600 text-gray-400 hover:text-white text-xs transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmClear(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-900/60 text-red-400 hover:bg-red-950/40 text-xs font-medium transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Clear data
+          </button>
         )}
       </div>
 
@@ -210,11 +272,16 @@ interface InstagramViewProps {
   onChange: (field: string, value: string) => void;
   onHandlesChange: (handles: string[]) => void;
   onValidate: () => Promise<void>;
+  onClear: () => Promise<void>;
   validating: boolean;
+  clearing: boolean;
 }
 
-function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate, validating }: InstagramViewProps) {
+function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate, onClear, validating, clearing }: InstagramViewProps) {
   const [handleInput, setHandleInput] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const disabled = !editing;
 
   function addHandle() {
     const v = handleInput.trim().replace(/^@?/, "@");
@@ -225,14 +292,32 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
 
   return (
     <div className="space-y-6 rounded-xl border border-gray-800 bg-gray-900 p-6">
-      <div className="border-b border-gray-800 pb-4">
-        <h2 className="text-base font-semibold text-white">Instagram Integration</h2>
-        <p className="mt-1 text-sm text-gray-400">
-          Track FarMart&apos;s Instagram posts and employee engagement.
-        </p>
+      <div className="flex items-start justify-between border-b border-gray-800 pb-4">
+        <div>
+          <h2 className="text-base font-semibold text-white">Instagram Integration</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Track FarMart&apos;s Instagram posts and employee engagement.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditing((e) => !e)}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+            editing
+              ? "border-gray-600 text-gray-400 hover:border-gray-500 hover:text-white"
+              : "border-green-700 bg-green-500/10 text-green-400 hover:bg-green-500/20"
+          )}
+        >
+          {editing ? (
+            <><X className="h-3.5 w-3.5" /> Cancel</>
+          ) : (
+            <><Pencil className="h-3.5 w-3.5" /> Edit</>
+          )}
+        </button>
       </div>
 
-      <div className="space-y-3">
+      <div className={cn("space-y-3 transition-opacity", disabled && "opacity-60")}>
         <div>
           <div className="flex items-center gap-2">
             <Label className="text-sm text-gray-300">Instagram Handles</Label>
@@ -249,23 +334,27 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
                 </div>
                 <span className="text-sm text-white">{h}</span>
               </div>
-              <button onClick={() => onHandlesChange(form.handles.filter((x) => x !== h))} className="text-gray-500 hover:text-white">
-                <X className="h-4 w-4" />
-              </button>
+              {!disabled && (
+                <button onClick={() => onHandlesChange(form.handles.filter((x) => x !== h))} className="text-gray-500 hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           ))}
-          <div className="flex gap-2">
-            <Input
-              value={handleInput}
-              onChange={(e) => setHandleInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addHandle()}
-              placeholder="@handle"
-              className="h-9 border-gray-700 bg-gray-800 text-white"
-            />
-            <Button onClick={addHandle} className="h-9 shrink-0 gap-1.5 bg-green-600 text-white hover:bg-green-700">
-              <Plus className="h-4 w-4" /> Add
-            </Button>
-          </div>
+          {!disabled && (
+            <div className="flex gap-2">
+              <Input
+                value={handleInput}
+                onChange={(e) => setHandleInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addHandle()}
+                placeholder="@handle"
+                className="h-9 border-gray-700 bg-gray-800 text-white"
+              />
+              <Button onClick={addHandle} className="h-9 shrink-0 gap-1.5 bg-green-600 text-white hover:bg-green-700">
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -280,7 +369,7 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
             dashboard.
           </p>
         </div>
-        <div className="space-y-4 rounded-lg border border-gray-700 bg-gray-800 p-4">
+        <div className={cn("space-y-4 rounded-lg border border-gray-700 bg-gray-800 p-4 transition-opacity", disabled && "opacity-60")}>
           <div className="flex items-center gap-2 border-b border-gray-700 pb-3">
             <div className="flex h-5 w-5 items-center justify-center rounded-sm bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400">
               <Camera className="h-3 w-3 text-white" />
@@ -293,7 +382,8 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
               value={form.app_id}
               onChange={(e) => onChange("app_id", e.target.value)}
               placeholder="123456789012345"
-              className="h-9 border-gray-600 bg-gray-900 text-white"
+              disabled={disabled}
+              className="h-9 border-gray-600 bg-gray-900 text-white disabled:cursor-not-allowed"
             />
           </div>
           <div className="space-y-1.5">
@@ -311,7 +401,8 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
               value={form.business_account_id}
               onChange={(e) => onChange("business_account_id", e.target.value)}
               placeholder="17841400000000000"
-              className="h-9 border-gray-600 bg-gray-900 text-white"
+              disabled={disabled}
+              className="h-9 border-gray-600 bg-gray-900 text-white disabled:cursor-not-allowed"
             />
           </div>
           <div className="space-y-1.5">
@@ -327,18 +418,51 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onValidate}
-          disabled={validating || !secretsSet.instagram_access_token}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-600 text-sm text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 transition-colors"
-        >
-          {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-          Test Connection
-        </button>
-        {!secretsSet.instagram_access_token && (
-          <p className="text-xs text-gray-500">Save an access token first to test.</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onValidate}
+            disabled={validating || !secretsSet.instagram_access_token}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-600 text-sm text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 transition-colors"
+          >
+            {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            Test Connection
+          </button>
+          {!secretsSet.instagram_access_token && (
+            <p className="text-xs text-gray-500">Save an access token first to test.</p>
+          )}
+        </div>
+
+        {confirmClear ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Remove all Instagram credentials?</span>
+            <button
+              type="button"
+              onClick={async () => { await onClear(); setConfirmClear(false); setEditing(false); }}
+              disabled={clearing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+            >
+              {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              Yes, clear
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmClear(false)}
+              className="px-3 py-1.5 rounded-lg border border-gray-600 text-gray-400 hover:text-white text-xs transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmClear(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-900/60 text-red-400 hover:bg-red-950/40 text-xs font-medium transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Clear data
+          </button>
         )}
       </div>
 
@@ -367,6 +491,7 @@ export function SettingsClient({
     instagram, setInstagram,
     secretsSet,
     saving, save,
+    clearing, clearLinkedIn, clearInstagram,
     validating, testLinkedIn, testInstagram,
   } = useOrgSettings(initialSettings);
 
@@ -413,7 +538,9 @@ export function SettingsClient({
               secretsSet={{ linkedin_client_secret: secretsSet.linkedin_client_secret, linkedin_access_token: secretsSet.linkedin_access_token }}
               onChange={(field, value) => setLinkedIn((f) => ({ ...f, [field]: value }))}
               onValidate={testLinkedIn}
+              onClear={clearLinkedIn}
               validating={validating === "linkedin"}
+              clearing={clearing === "linkedin"}
             />
           )}
 
@@ -424,7 +551,9 @@ export function SettingsClient({
               onChange={(field, value) => setInstagram((f) => ({ ...f, [field]: value }))}
               onHandlesChange={(handles) => setInstagram((f) => ({ ...f, handles }))}
               onValidate={testInstagram}
+              onClear={clearInstagram}
               validating={validating === "instagram"}
+              clearing={clearing === "instagram"}
             />
           )}
         </div>

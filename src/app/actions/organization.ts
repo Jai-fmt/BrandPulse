@@ -105,6 +105,38 @@ Record<string, any> = {};
   return { data: undefined as void, error: null };
 }
 
+/** Wipe all credentials for one platform (sets every field to NULL in the DB). */
+export async function clearPlatformSettings(
+  platform: "linkedin" | "instagram"
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { data: null, error: "Not connected to database." };
+
+  const orgId = await getOrgId();
+  if (!orgId) return { data: null, error: "No organisation found." };
+
+  const patch =
+    platform === "linkedin"
+      ? {
+          linkedin_company_url: null,
+          linkedin_client_id: null,
+          linkedin_company_id: null,
+          linkedin_client_secret: null,
+          linkedin_access_token: null,
+        }
+      : {
+          instagram_app_id: null,
+          instagram_business_account_id: null,
+          instagram_handles: null,
+          instagram_app_secret: null,
+          instagram_access_token: null,
+        };
+
+  const { error } = await supabase.from("organizations").update(patch).eq("id", orgId);
+  if (error) return { data: null, error: error.message };
+  return { data: undefined as void, error: null };
+}
+
 /** Test the stored LinkedIn access token against the LinkedIn API. */
 export async function validateLinkedInConnection(): Promise<ValidationResult> {
   const supabase = await createClient();
