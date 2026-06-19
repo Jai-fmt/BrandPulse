@@ -26,6 +26,7 @@ import {
   RefreshCw,
   ExternalLink,
   FileText,
+  Pencil,
 } from "lucide-react";
 import type { Post } from "@/types/database";
 import { clsx } from "clsx";
@@ -198,6 +199,119 @@ function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
   );
 }
 
+// ── Update Stats Modal ────────────────────────────────────────────────────────
+
+interface UpdateStatsModalProps {
+  post: Post | null;
+  onClose: () => void;
+  onSave: (post: Post) => void;
+}
+
+function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
+  const supabase = createClient();
+  const [likes, setLikes] = useState("");
+  const [comments, setComments] = useState("");
+  const [shares, setShares] = useState("");
+  const [reposts, setReposts] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Populate fields when post changes
+  useState(() => {
+    if (post) {
+      setLikes(post.total_likes > 0 ? String(post.total_likes) : "");
+      setComments(post.total_comments > 0 ? String(post.total_comments) : "");
+      setShares(post.total_shares > 0 ? String(post.total_shares) : "");
+      setReposts(post.total_reposts > 0 ? String(post.total_reposts) : "");
+    }
+  });
+
+  function numVal(v: string) { return Math.max(0, parseInt(v, 10) || 0); }
+
+  async function handleSave() {
+    if (!post || !supabase) return;
+    setSaving(true);
+    const patch = {
+      total_likes: numVal(likes),
+      total_comments: numVal(comments),
+      total_shares: numVal(shares),
+      total_reposts: numVal(reposts),
+      status: "synced" as const,
+      last_synced_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("company_posts").update(patch).eq("id", post.id);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    onSave({ ...post, ...patch });
+    toast.success("Stats updated.");
+    onClose();
+  }
+
+  function handleClose() {
+    setLikes(""); setComments(""); setShares(""); setReposts("");
+    onClose();
+  }
+
+  return (
+    <Dialog open={!!post} onOpenChange={handleClose}>
+      <DialogContent className="bg-[#1a1a1a] border-white/10 text-white sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white text-base">Update Engagement Stats</DialogTitle>
+        </DialogHeader>
+
+        {post && (
+          <div className="space-y-4 py-1">
+            <div className="rounded-lg bg-white/5 border border-white/5 px-3 py-2.5">
+              <p className="text-sm font-medium text-white truncate">{post.title ?? "Untitled"}</p>
+              <p className="text-xs text-gray-500 truncate mt-0.5">{post.post_url}</p>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Enter the numbers you see on the post. Status will be set to <span className="text-emerald-400 font-medium">synced</span>.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Likes", icon: ThumbsUp, color: "text-emerald-400", value: likes, set: setLikes },
+                { label: "Comments", icon: MessageSquare, color: "text-blue-400", value: comments, set: setComments },
+                { label: "Shares", icon: Share2, color: "text-orange-400", value: shares, set: setShares },
+                { label: "Reposts", icon: Repeat2, color: "text-purple-400", value: reposts, set: setReposts },
+              ].map(({ label, icon: Icon, color, value, set }) => (
+                <div key={label} className="space-y-1.5">
+                  <Label className="text-xs text-gray-400 flex items-center gap-1.5">
+                    <Icon className={`w-3.5 h-3.5 ${color}`} />
+                    {label}
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={value}
+                    onChange={(e) => set(e.target.value)}
+                    placeholder="0"
+                    className="bg-[#111] border-white/10 text-white h-9 text-sm focus:border-emerald-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 pt-1">
+          <button onClick={handleClose} className="text-sm text-gray-400 hover:text-white px-4 py-2 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+          >
+            {saving ? "Saving…" : "Save Stats"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main PostTracking Component ───────────────────────────────────────────────
 
 type PlatformFilter = "all" | "linkedin" | "instagram";
@@ -215,6 +329,7 @@ export function PostTracking({
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
 
   const filtered = posts.filter((p) => {
     const isArchived = p.status === "archived";
@@ -451,15 +566,26 @@ export function PostTracking({
                       </td>
 
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleArchive(post)}
-                          title={post.status === "archived" ? "Restore post" : "Archive post"}
-                          className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-                        >
-                          {post.status === "archived"
-                            ? <ArchiveRestore className="w-4 h-4" />
-                            : <Archive className="w-4 h-4" />}
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {post.status !== "archived" && (
+                            <button
+                              onClick={() => setEditingPost(post)}
+                              title="Update stats manually"
+                              className="p-1.5 rounded-md text-gray-500 hover:text-emerald-400 hover:bg-white/5 transition-colors"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleArchive(post)}
+                            title={post.status === "archived" ? "Restore post" : "Archive post"}
+                            className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+                          >
+                            {post.status === "archived"
+                              ? <ArchiveRestore className="w-4 h-4" />
+                              : <Archive className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -482,6 +608,12 @@ export function PostTracking({
         open={showModal}
         onClose={() => setShowModal(false)}
         onAdd={(post) => setPosts((prev) => [post, ...prev])}
+      />
+
+      <UpdateStatsModal
+        post={editingPost}
+        onClose={() => setEditingPost(null)}
+        onSave={(updated) => setPosts((prev) => prev.map((p) => p.id === updated.id ? updated : p))}
       />
     </div>
   );
