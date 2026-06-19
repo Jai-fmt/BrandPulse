@@ -138,7 +138,7 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, onClear, validat
 
       <div className="space-y-1.5">
         <Label className="text-sm text-gray-300">Company Page URL</Label>
-        <p className="text-xs text-gray-500">The URL of your FarMart LinkedIn company page.</p>
+        <p className="text-xs text-gray-500">The URL of your company&apos;s LinkedIn page.</p>
         <Input
           value={form.company_url}
           onChange={(e) => onChange("company_url", e.target.value)}
@@ -296,7 +296,7 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
         <div>
           <h2 className="text-base font-semibold text-white">Instagram Integration</h2>
           <p className="mt-1 text-sm text-gray-400">
-            Track FarMart&apos;s Instagram posts and employee engagement.
+            Track company Instagram posts and employee engagement.
           </p>
         </div>
         <button
@@ -323,7 +323,7 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
             <Label className="text-sm text-gray-300">Instagram Handles</Label>
             <span className="text-xs font-medium text-green-400">{form.handles.length} added</span>
           </div>
-          <p className="mt-0.5 text-xs text-gray-500">All official FarMart Instagram accounts to monitor.</p>
+          <p className="mt-0.5 text-xs text-gray-500">All official company Instagram accounts to monitor.</p>
         </div>
         <div className="space-y-2">
           {form.handles.map((h) => (

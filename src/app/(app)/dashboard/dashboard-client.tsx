@@ -70,7 +70,7 @@ export function DashboardClient({
       {/* Header */}
       <div className="mb-7">
         <h1 className="text-3xl font-bold text-white">Overview</h1>
-        <p className="text-gray-500 mt-1 text-sm">FarMart employee advocacy metrics — All time</p>
+        <p className="text-gray-500 mt-1 text-sm">Employee advocacy metrics — All time</p>
       </div>
 
       {/* Top stat cards */}

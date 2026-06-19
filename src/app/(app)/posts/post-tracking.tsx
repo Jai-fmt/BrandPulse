@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { deletePost } from "@/app/actions/posts";
 import { Input } from "@/components/ui/input";
@@ -53,19 +53,39 @@ function PlatformBadge({ platform }: { platform: Post["platform"] }) {
   );
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  synced:   "bg-emerald-900/50 text-emerald-300",
-  syncing:  "bg-blue-900/50 text-blue-300",
-  pending:  "bg-gray-800 text-gray-400",
-  error:    "bg-red-900/50 text-red-300",
-  archived: "bg-gray-800/50 text-gray-500",
-};
+// Maps the DB status + connection context to a display label + style.
+function resolveStatus(
+  dbStatus: Post["status"],
+  platform: Post["platform"],
+  linkedInConnected: boolean
+): { label: string; style: string } {
+  if (dbStatus === "pending") {
+    if (platform === "linkedin" && !linkedInConnected) {
+      return { label: "Awaiting Connection", style: "bg-amber-900/40 text-amber-400" };
+    }
+    return { label: "Awaiting Sync", style: "bg-gray-800 text-gray-400" };
+  }
+  if (dbStatus === "syncing")  return { label: "Syncing…",          style: "bg-blue-900/50 text-blue-300" };
+  if (dbStatus === "synced")   return { label: "Synced",            style: "bg-emerald-900/50 text-emerald-300" };
+  if (dbStatus === "error")    return { label: "Sync Failed",       style: "bg-red-900/50 text-red-300" };
+  if (dbStatus === "archived") return { label: "Archived",          style: "bg-gray-800/50 text-gray-500" };
+  return                              { label: dbStatus,            style: "bg-gray-800 text-gray-400" };
+}
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+  platform,
+  linkedInConnected,
+}: {
+  status: Post["status"];
+  platform: Post["platform"];
+  linkedInConnected: boolean;
+}) {
+  const { label, style } = resolveStatus(status, platform, linkedInConnected);
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[status] ?? "bg-gray-800 text-gray-400"}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${style}`}>
       {status === "syncing" && <RefreshCw className="w-2.5 h-2.5 mr-1 animate-spin" />}
-      {status}
+      {label}
     </span>
   );
 }
@@ -128,7 +148,14 @@ function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
       .select()
       .single();
 
-    if (error) { toast.error(error.message); setSaving(false); return; }
+    if (error) {
+      const msg = error.code === "23505"
+        ? "This post URL is already being tracked."
+        : error.message;
+      toast.error(msg);
+      setSaving(false);
+      return;
+    }
 
     onAdd(data);
     toast.success("Post added — sync will pull engagement data on the next run.");
@@ -178,7 +205,7 @@ function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. FarMart Q2 Announcement"
+              placeholder="e.g. Q2 Product Announcement"
               className="bg-[#111] border-white/10 text-white placeholder:text-gray-600 focus:border-emerald-500 h-9 text-sm"
             />
           </div>
@@ -209,22 +236,22 @@ interface UpdateStatsModalProps {
   onSave: (post: Post) => void;
 }
 
+const EMPTY_STATS = { likes: "", comments: "", shares: "", reposts: "" };
+
+function initStats(post: Post | null) {
+  if (!post) return EMPTY_STATS;
+  return {
+    likes:    post.total_likes    > 0 ? String(post.total_likes)    : "",
+    comments: post.total_comments > 0 ? String(post.total_comments) : "",
+    shares:   post.total_shares   > 0 ? String(post.total_shares)   : "",
+    reposts:  post.total_reposts  > 0 ? String(post.total_reposts)  : "",
+  };
+}
+
 function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
   const supabase = createClient();
-  const [likes, setLikes] = useState("");
-  const [comments, setComments] = useState("");
-  const [shares, setShares] = useState("");
-  const [reposts, setReposts] = useState("");
+  const [stats, setStats] = useState(() => initStats(post));
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (post) {
-      setLikes(post.total_likes > 0 ? String(post.total_likes) : "");
-      setComments(post.total_comments > 0 ? String(post.total_comments) : "");
-      setShares(post.total_shares > 0 ? String(post.total_shares) : "");
-      setReposts(post.total_reposts > 0 ? String(post.total_reposts) : "");
-    }
-  }, [post]);
 
   function numVal(v: string) { return Math.max(0, parseInt(v, 10) || 0); }
 
@@ -232,10 +259,10 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
     if (!post || !supabase) return;
     setSaving(true);
     const patch = {
-      total_likes: numVal(likes),
-      total_comments: numVal(comments),
-      total_shares: numVal(shares),
-      total_reposts: numVal(reposts),
+      total_likes:    numVal(stats.likes),
+      total_comments: numVal(stats.comments),
+      total_shares:   numVal(stats.shares),
+      total_reposts:  numVal(stats.reposts),
       status: "synced" as const,
       last_synced_at: new Date().toISOString(),
     };
@@ -248,15 +275,15 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
   }
 
   function handleClose() {
-    setLikes(""); setComments(""); setShares(""); setReposts("");
+    setStats(EMPTY_STATS);
     onClose();
   }
 
   const fields = [
-    { label: "Likes",    icon: ThumbsUp,      color: "text-emerald-400", value: likes,    set: setLikes },
-    { label: "Comments", icon: MessageSquare,  color: "text-blue-400",    value: comments, set: setComments },
-    { label: "Shares",   icon: Share2,         color: "text-orange-400",  value: shares,   set: setShares },
-    { label: "Reposts",  icon: Repeat2,        color: "text-purple-400",  value: reposts,  set: setReposts },
+    { label: "Likes",    icon: ThumbsUp,     color: "text-emerald-400", value: stats.likes,    key: "likes"    as const },
+    { label: "Comments", icon: MessageSquare, color: "text-blue-400",    value: stats.comments, key: "comments" as const },
+    { label: "Shares",   icon: Share2,        color: "text-orange-400",  value: stats.shares,   key: "shares"   as const },
+    { label: "Reposts",  icon: Repeat2,       color: "text-purple-400",  value: stats.reposts,  key: "reposts"  as const },
   ];
 
   return (
@@ -279,7 +306,7 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
 
             {/* Stat inputs */}
             <div className="grid grid-cols-2 gap-3">
-              {fields.map(({ label, icon: Icon, color, value, set }) => (
+              {fields.map(({ label, icon: Icon, color, value, key }) => (
                 <div key={label} className="space-y-1.5">
                   <label className={`text-xs font-medium flex items-center gap-1.5 ${color}`}>
                     <Icon className="w-3.5 h-3.5" />
@@ -290,7 +317,7 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
                     inputMode="numeric"
                     pattern="[0-9]*"
                     value={value}
-                    onChange={(e) => set(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => setStats((s) => ({ ...s, [key]: e.target.value.replace(/\D/g, "") }))}
                     placeholder="0"
                     className="w-full h-10 rounded-lg bg-[#111] border border-white/10 px-3 text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-emerald-500 transition-colors"
                   />
@@ -328,9 +355,11 @@ type PlatformFilter = "all" | "linkedin" | "instagram";
 export function PostTracking({
   initialPosts,
   error,
+  linkedInConnected,
 }: {
   initialPosts: Post[];
   error?: string;
+  linkedInConnected?: boolean;
 }) {
   const supabase = createClient();
   const [posts, setPosts] = useState<Post[]>(initialPosts);
@@ -340,6 +369,44 @@ export function PostTracking({
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const isLinkedInConnected = linkedInConnected ?? false;
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/sync/linkedin", { method: "POST" });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
+
+      if (!res.ok) {
+        toast.error(data?.error ?? "Sync failed.");
+        return;
+      }
+
+      toast.success(
+        data.posts_synced > 0
+          ? `Sync complete — ${data.posts_synced} of ${data.posts_processed} posts updated.`
+          : data.error
+            ? `Sync ran but hit an error: ${data.error}`
+            : "Sync complete. No posts were updated."
+      );
+
+      // Refetch posts to reflect new statuses / stats
+      if (supabase) {
+        const { data: refreshed } = await supabase
+          .from("company_posts")
+          .select("id, org_id, account_id, platform, post_url, platform_post_id, title, content_preview, published_at, last_synced_at, total_likes, total_comments, total_shares, total_reposts, total_mentions, sync_error, status, created_at")
+          .neq("status", "archived")
+          .order("created_at", { ascending: false });
+        if (refreshed) setPosts(refreshed as Post[]);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const filtered = posts.filter((p) => {
     const isArchived = p.status === "archived";
@@ -400,15 +467,23 @@ export function PostTracking({
           <div className="flex items-center gap-2">
             <div className="relative group">
               <button
-                disabled
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-white/10 text-gray-500 text-sm font-medium cursor-not-allowed"
+                onClick={isLinkedInConnected ? handleSync : undefined}
+                disabled={syncing || !isLinkedInConnected}
+                className={clsx(
+                  "flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-medium transition-colors",
+                  isLinkedInConnected && !syncing
+                    ? "border-blue-700/60 bg-blue-950/40 text-blue-300 hover:bg-blue-900/40 hover:text-blue-200"
+                    : "border-white/10 text-gray-500 cursor-not-allowed"
+                )}
               >
-                <RefreshCw className="w-4 h-4" />
-                Sync Now
+                <RefreshCw className={clsx("w-4 h-4", syncing && "animate-spin")} />
+                {syncing ? "Syncing…" : "Sync Now"}
               </button>
-              <div className="absolute right-0 top-full mt-1.5 w-56 px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-xs text-gray-400 hidden group-hover:block z-10 shadow-xl">
-                Automated sync coming soon. Add credentials in Settings and we&apos;ll pull engagement data automatically.
-              </div>
+              {!isLinkedInConnected && (
+                <div className="absolute right-0 top-full mt-1.5 w-64 px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-xs text-gray-400 hidden group-hover:block z-10 shadow-xl">
+                  Connect LinkedIn in Settings before syncing.
+                </div>
+              )}
             </div>
             <button
               onClick={() => setShowModal(true)}
@@ -439,20 +514,37 @@ export function PostTracking({
         </div>
       </div>
 
-      {/* Demo guidance banner */}
+      {/* Connection / sync guidance banner */}
       {activePosts.length > 0 && syncedCount === 0 && (
         <div className="px-8 pb-4">
-          <div className="flex items-start gap-3 bg-blue-950/40 border border-blue-800/40 rounded-xl px-4 py-3 text-sm text-blue-300">
-            <span className="mt-0.5 shrink-0 text-blue-400">ℹ</span>
-            <span>
-              Posts are tracked but show <span className="font-medium text-white">pending</span> — engagement data will populate once automated sync is configured.
-              In the meantime, use{" "}
-              <a href="/submissions" className="text-white font-medium underline underline-offset-2 hover:text-blue-200">
-                Submissions
-              </a>{" "}
-              to manually log employee engagement on these posts.
-            </span>
-          </div>
+          {isLinkedInConnected ? (
+            <div className="flex items-start gap-3 bg-blue-950/40 border border-blue-800/40 rounded-xl px-4 py-3 text-sm text-blue-300">
+              <span className="mt-0.5 shrink-0 text-blue-400">ℹ</span>
+              <span>
+                LinkedIn is connected. Click <span className="font-medium text-white">Sync Now</span> to pull engagement data from the LinkedIn API.
+                You can also use{" "}
+                <a href="/submissions" className="text-white font-medium underline underline-offset-2 hover:text-blue-200">
+                  Submissions
+                </a>{" "}
+                to log engagement manually.
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 bg-amber-950/40 border border-amber-800/40 rounded-xl px-4 py-3 text-sm text-amber-300">
+              <span className="mt-0.5 shrink-0 text-amber-400">⚠</span>
+              <span>
+                Posts are awaiting a LinkedIn connection.{" "}
+                <a href="/settings" className="text-white font-medium underline underline-offset-2 hover:text-amber-200">
+                  Add credentials in Settings
+                </a>{" "}
+                to enable sync, or use{" "}
+                <a href="/submissions" className="text-white font-medium underline underline-offset-2 hover:text-amber-200">
+                  Submissions
+                </a>{" "}
+                to log engagement manually.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -577,7 +669,7 @@ export function PostTracking({
                       <td className="px-3 py-3 text-center font-semibold text-white">{post.total_reposts}</td>
 
                       <td className="px-4 py-3">
-                        <StatusBadge status={post.status} />
+                        <StatusBadge status={post.status} platform={post.platform} linkedInConnected={isLinkedInConnected} />
                         {post.last_synced_at && (
                           <p className="text-[10px] text-gray-600 mt-0.5">{formatDate(post.last_synced_at)}</p>
                         )}
@@ -654,6 +746,7 @@ export function PostTracking({
       />
 
       <UpdateStatsModal
+        key={editingPost?.id ?? "none"}
         post={editingPost}
         onClose={() => setEditingPost(null)}
         onSave={(updated) => setPosts((prev) => prev.map((p) => p.id === updated.id ? updated : p))}

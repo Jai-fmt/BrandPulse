@@ -102,6 +102,39 @@ Record<string, any> = {};
     .eq("id", orgId);
 
   if (error) return { data: null, error: error.message };
+
+  // After saving org credentials, sync company_social_accounts so the sync
+  // route has a single table to read from. Re-read full org state so we can
+  // upsert even when only partial fields were in this save call.
+  const { data: orgData } = await (supabase
+    .from("organizations")
+    .select("linkedin_company_url, linkedin_company_id, linkedin_access_token")
+    .eq("id", orgId)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .single() as unknown as Promise<{ data: Record<string, any> | null }>);
+
+  if (orgData?.linkedin_company_id && orgData?.linkedin_access_token) {
+    const companyUrl: string = orgData.linkedin_company_url ?? "";
+    const slug = companyUrl.includes("/company/")
+      ? companyUrl.split("/company/")[1]?.split("/")[0] ?? null
+      : null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const accountRow: Record<string, any> = {
+      org_id: orgId,
+      platform: "linkedin",
+      platform_account_id: orgData.linkedin_company_id,
+      handle: slug,
+      company_url: companyUrl || null,
+      access_token: orgData.linkedin_access_token,
+      sync_enabled: true,
+      connection_status: "connected",
+    };
+    await supabase
+      .from("company_social_accounts")
+      .upsert(accountRow, { onConflict: "org_id,platform,platform_account_id" });
+  }
+
   return { data: undefined as void, error: null };
 }
 
@@ -134,6 +167,15 @@ export async function clearPlatformSettings(
 
   const { error } = await supabase.from("organizations").update(patch).eq("id", orgId);
   if (error) return { data: null, error: error.message };
+
+  // Remove the corresponding social account row so Sync Now immediately
+  // shows "Awaiting Connection" rather than using stale credentials.
+  await supabase
+    .from("company_social_accounts")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("platform", platform);
+
   return { data: undefined as void, error: null };
 }
 

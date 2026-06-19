@@ -266,7 +266,7 @@ export function SubmissionsClient({
             </p>
             <p className="text-gray-500 text-sm max-w-sm mb-5">
               {statusFilter === "all"
-                ? "Manually log employee engagement on official FarMart posts. This is the recommended way to track advocacy until automated sync is live."
+                ? "Manually log employee engagement on official company posts. This is the recommended way to track advocacy until automated sync is live."
                 : "No submissions match this filter."}
             </p>
             {statusFilter === "all" && (

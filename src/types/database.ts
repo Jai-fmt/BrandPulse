@@ -92,6 +92,23 @@ export interface ManualSubmissionRow {
   created_at: string;
 }
 
+export interface CompanySocialAccountRow {
+  id: string;
+  org_id: string;
+  platform: "linkedin" | "instagram";
+  platform_account_id: string;
+  handle: string | null;
+  display_name: string | null;
+  company_url: string | null;
+  access_token: string | null;
+  sync_enabled: boolean;
+  connection_status: "connected" | "disconnected" | "error";
+  sync_error: string | null;
+  last_sync_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface SyncLogRow {
   id: string;
   org_id: string;
@@ -167,13 +184,14 @@ export interface Database {
 
 // ─── Convenience aliases ──────────────────────────────────────────────────────
 
-export type Organization    = OrganizationRow;
-export type Employee        = EmployeeRow;
-export type CompanyPost     = PostRow;
-export type Post            = PostRow;  // backwards-compat alias
-export type EngagementEvent = EngagementRow;
-export type ManualSubmission  = ManualSubmissionRow;
-export type SyncLog         = SyncLogRow;
+export type Organization         = OrganizationRow;
+export type Employee             = EmployeeRow;
+export type CompanyPost          = PostRow;
+export type Post                 = PostRow;  // backwards-compat alias
+export type CompanySocialAccount = CompanySocialAccountRow;
+export type EngagementEvent      = EngagementRow;
+export type ManualSubmission     = ManualSubmissionRow;
+export type SyncLog              = SyncLogRow;
 
 // ─── Domain helpers ───────────────────────────────────────────────────────────
 
